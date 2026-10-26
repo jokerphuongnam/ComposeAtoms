@@ -59,6 +59,19 @@ inline fun <reified T> cache(
     return CacheRegistry.lease(key, T::class.java.name, staleTime, gcTime, fetch)
 }
 
+/** Runs [fetch] on the caller and returns the value. A fresh entry skips [fetch]. */
+inline fun <reified T> cache(
+    key: String,
+    staleTime: Duration = Duration.ZERO,
+    gcTime: Duration,
+    noinline fetch: () -> T,
+): T {
+    CacheRegistry.fresh<T>(key, T::class.java.name, staleTime, gcTime)?.let { return it }
+    val value = fetch()
+    CacheRegistry.store(key, T::class.java.name, value, staleTime, gcTime)
+    return value
+}
+
 /**
  * Subscribes this composable to [query]. Leaving the composition drops the observer.
  * The query does not retain the composable. After the last observer is gone the result stays for `gcTime`.
@@ -106,6 +119,32 @@ object CacheRegistry {
         return CacheQuery(created)
     }
 
+    @Suppress("UNCHECKED_CAST")
+    fun <T> fresh(key: String, type: String, staleTime: Duration, gcTime: Duration): T? {
+        synchronized(this) {
+            val entry = entries["$key\u0000$type"] as CacheEntry<T>? ?: return null
+            entry.staleTime = staleTime
+            entry.gcTime = gcTime
+            return entry.freshValue()
+        }
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    fun <T> store(key: String, type: String, value: T, staleTime: Duration, gcTime: Duration) {
+        synchronized(this) {
+            val identity = "$key\u0000$type"
+            val existing = entries[identity] as CacheEntry<T>?
+            val entry = if (existing != null) {
+                existing.staleTime = staleTime
+                existing.gcTime = gcTime
+                existing
+            } else {
+                CacheEntry(identity, { value }, staleTime, gcTime).also { entries[identity] = it }
+            }
+            entry.remember(value)
+        }
+    }
+
     internal fun remove(identity: String, entry: CacheEntry<*>) {
         if (entries[identity] === entry) entries.remove(identity)
     }
@@ -128,6 +167,28 @@ internal class CacheEntry<T>(
     private val listeners = LinkedHashSet<() -> Unit>()
 
     fun snapshot(): CacheResult<T> = CacheResult(data, error, isFetching, status)
+
+    fun freshValue(): T? = if (data != null && !isStale()) data else null
+
+    fun remember(value: T) {
+        data = value
+        error = null
+        status = CacheStatus.Success
+        isFetching = false
+        updatedAt = CacheClock.nowMillis()
+        publish()
+        if (observers != 0) return
+        if (gcTime == Duration.ZERO) {
+            evict()
+            return
+        }
+        val wait = gcTime
+        collect?.cancel()
+        collect = cacheScope.launch {
+            delay(wait)
+            if (observers == 0) evict()
+        }
+    }
 
     fun subscribe(listener: () -> Unit): () -> Unit {
         listeners.add(listener)
