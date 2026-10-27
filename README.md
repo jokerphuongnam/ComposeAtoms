@@ -1,102 +1,98 @@
-# ComposeAtoms
+# ComposeHooks
 
-Jotai-style state for Jetpack Compose. There is no `ViewModel` and no `send`. A piece of state is an atom. A composable subscribes with a `remember` hook. Writing the atom recomposes every composable that reads it.
+React-style hooks for Jetpack Compose with **owner lifetime** (state lives as long as the
+`ViewModelStoreOwner` — nav back-stack entry / activity — not as long as the composition).
 
-The atom does not keep a composable on screen. `parentState` is a `staticCompositionLocalOf` scope. It publishes the parent value down the tree and does not observe fields inside that value.
+| Module | Package | What |
+|---|---|---|
+| `:hooks` | `compose.hooks` | core: `customRemember` scope tree, `rememberState`, `rememberEffect`, `rememberContext`, React hooks |
+| `:query` | `compose.hooks.query` | Atoms port: `globalState`, `shareState`, `cache`, `ParentState` (depends on `:hooks` via `api`) |
+| `:hooks-compiler` | – | K2 FIR checker (rules of hooks) |
+| `:hooks-gradle-plugin` | – | plugin id `compose.hooks` wiring the compiler plugin |
+| `:example` | – | sample app |
 
-## Install
-
-`minSdk` 26. Package name `compose.atoms`. Add the Maven repository that hosts the artifact, then:
-
-```kotlin
-dependencies {
-    implementation("compose.atoms:atoms:1.0.0")
-}
-```
-
-On this machine the artifact is in Maven local after `./gradlew :atoms:publishToMavenLocal`. The Android app then needs:
+## Usage
 
 ```kotlin
-repositories {
-    mavenLocal()
-}
-```
+import compose.hooks.customRemember
+import compose.hooks.rememberState
+import compose.hooks.rememberEffect
+import compose.hooks.query.cache
+import compose.hooks.query.rememberCache
+import compose.hooks.query.rememberGlobalState
+import compose.hooks.query.rememberShareState
 
-The app module already applies Jetpack Compose. Import `compose.atoms.rememberGlobalState` and the other hooks. The example app in this repo uses `implementation(project(":atoms"))` so it builds without publishing.
-
-## Atoms
-
-Create an atom outside composition so its identity is stable.
-
-```kotlin
-val count = globalState { 0 }
+private val profileQuery = cache<Profile>("profile", staleTime = 60.seconds) { api.profile() }
 
 @Composable
-fun Counter() {
-    val state = rememberGlobalState { 0 }
-    Button(onClick = { state.set(state.value + 1) }) {
-        Text("${state.value}")
-    }
-}
-```
-
-`globalState` keeps one atom per type until the process exits. `Session` and `Title` are two atoms.
-
-## Share
-
-```kotlin
-val note = shareState("note") { Note() }
-
-@Composable
-fun Editor() {
-    val note = rememberShareState("note") { Note() }
-    Text(note.value.text)
-}
-```
-
-The same id and the same type are one atom. The same id and another type are another atom. `rememberShareState` holds the atom while that composable is in the tree. The last composable to leave releases it.
-
-## Parent
-
-```kotlin
-@Composable
-fun Wizard(wizard: WizardModel) {
-    ParentState(wizard) {
-        Step()
-    }
+fun rememberProfileForm() = customRemember {
+    val session by rememberGlobalState { Session("Ada") }
+    val profile = rememberCache(profileQuery)
+    var name by rememberState("")
+    rememberEffect(profile.data) { profile.data?.let { name = it.name } }
+    ProfileForm(session, profile, name, onName = { name = it })
 }
 
 @Composable
-fun Step() {
-    val wizard = rememberParentState<WizardModel>()
-    Text(wizard.title)
+fun ProfileScreen() {
+    val form = rememberProfileForm()
+    var note by rememberShareState("note") { Note("") }
+    // ...
 }
 ```
 
-`ParentState` uses `staticCompositionLocalOf`. Children see that value. Composables outside it do not. A sibling does not see the other sibling's model.
+`:query` hooks work both inside and outside `customRemember` (bare hooks get an implicit scope).
 
-## Cache
+## Core API (`compose.hooks`)
 
-The cache does not compare the fetch closure. It pairs the string key with the result type.
+- `customRemember(key = null, name = "customRemember") { ... }` — groups hooks into a scope; nested
+  `customRemember` = child scope. Scopes are stored in a `HooksViewModel` of the current
+  `ViewModelStoreOwner`; cleared when the owner is cleared (nav pop / finish), children first.
+  Without an owner (e.g. preview) falls back to `remember` + `RememberObserver`.
+- `rememberState(policy) { init }` / `rememberState(value)` — `MutableState` surviving recreate/back.
+  Note: in the value form the argument expression is still **evaluated every pass** (only the first value is stored).
+- `rememberEffect(vararg deps) { ... }` — runs after commit (SideEffect) when deps change (`contentEquals`);
+  no deps = once per owner lifetime. Receiver is a `CoroutineScope` cancelled before cleanup.
+  If the block returns a `() -> Unit`, it is the cleanup.
+  **Pitfall:** `launch { }` followed by `{ cleanup }` on the next line is parsed as a second trailing lambda — write
+  `val cleanup = { ... }; cleanup`.
+- `hookContextOf<T>(name, default?)`, `ctx.Provider(value) { }`, `rememberContext(ctx)` — lending context:
+  the lease is revoked when the provider's scope clears (`RevokedContextException`);
+  no provider and no default → `MissingProviderException`.
+- React hooks: `rememberReducer`, `rememberMemo(vararg deps)`, `rememberRef`, `rememberUpdated`,
+  `rememberFlow(flow, initial, keys)`, `rememberId(prefix)`.
+- Rules: hooks inside a scope must be called in the same order each pass (otherwise `IllegalStateException`).
+  Use `key(id) { }` in loops. Errors from cleanups are reported via `Hooks.onError` (default rethrows).
+
+**Stability note (C2):** a lambda that captures the `MutableState` object is memoized by strong skipping;
+a lambda capturing a destructured setter (`val (v, set) = ...`) is a new lambda each pass.
+
+## Migration from ComposeAtoms
+
+Change the package `compose.atoms` → `compose.hooks.query`; function names are unchanged. Behaviour changes:
+
+- `rememberAtom`, `rememberShareState`, `rememberCache` have **owner lifetime** (released on pop), not composition lifetime.
+- `shareState` is ref-counted: after the last user leaves, the entry and its value are reset.
+- `ParentState` is built on `rememberContext`; `LocalParentScope` / `ParentScope` removed;
+  a missing parent throws `MissingProviderException`.
+- `AtomState` gained `getValue` (delegation) and `component1/2`.
+- `CacheQuery` equality is by entry.
+- `rememberCache` subscribes **before** retaining (fixes a missed synchronous fetch result in Atoms).
+- `cache(..., gcTime = ...) { }` with a trailing lambda is ambiguous between the sync/suspend overloads — use `fetch = suspend { }`.
+
+## Compiler plugin
 
 ```kotlin
-val fact = cache<String>(key = "fact", staleTime = 60.seconds) {
-    fetchFact()
-}
-
-@Composable
-fun FactScreen() {
-    val fact = rememberCache(fact)
-    Text(fact.data ?: if (fact.isFetching) "Loading" else "")
-}
+plugins { id("compose.hooks") }   // or kotlinCompilerPluginClasspath(project(":hooks-compiler"))
 ```
 
-Same key and same result type share one in-flight fetch. Inside `staleTime` the next read returns the stored value. Same key and a different result type are a second cache. Default `staleTime` is zero. Default `gcTime` is five minutes after the last `rememberCache` leaves.
+- `[E1]` hook called conditionally (error) / in a loop without `key` (warning)
+- `[E2]` `hookContextOf` without default and no `Provider` in the same file (error)
+- `[B5]` lent context escaping into `GlobalScope.launch/async`, `thread {}`, `Thread {}` (warning)
 
-## Example
+Not done yet: P1 transforms (auto-key etc. — runtime fallback is used), cross-file E2 / cycle detection.
 
-`:example` is a small Android app. `ExampleActivity` shows global, share, parent, and cache on one screen. A button changes the atom. The reader composable below it shows the same value.
+## Build
 
-```bash
-./gradlew :example:assembleDebug
-```
+Requires JDK 17–21 for Gradle (Kotlin 2.0.21 does not run on JDK 25).
+`./gradlew :hooks:testDebugUnitTest :query:testDebugUnitTest :hooks-compiler:test :example:assembleDebug`
