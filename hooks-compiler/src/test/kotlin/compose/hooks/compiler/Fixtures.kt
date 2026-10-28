@@ -13,7 +13,7 @@ import org.jetbrains.kotlin.config.Services
 internal object Fixtures {
     data class Msg(val severity: CompilerMessageSeverity, val file: String, val line: Int, val text: String)
 
-    private val STUBS = listOf("Stubs.kt", "StubsRuntime.kt", "StubsCoroutines.kt", "StubsQuery.kt")
+    private val STUBS = listOf("Stubs.kt", "StubsRuntime.kt", "StubsCoroutines.kt", "StubsQuery.kt", "StubsTest.kt", "StubsAndroid.kt")
 
     val dir: File get() = File(javaClass.classLoader.getResource("fixtures/Stubs.kt")!!.toURI()).parentFile
 
@@ -33,7 +33,7 @@ internal object Fixtures {
         }
         val args = arrayOf(
             "-Xplugin=" + System.getProperty("hooks.plugin.jar"),
-            "-classpath", stdlib, "-no-stdlib", "-no-reflect", "-language-version", "2.0",
+            "-classpath", stdlib, "-no-stdlib", "-no-reflect",
             "-d", out.path,
         ) + sources
         val compiler = K2JVMCompiler()
@@ -41,6 +41,7 @@ internal object Fixtures {
         org.jetbrains.kotlin.cli.common.arguments.parseCommandLineArguments(args.toList(), parsed)
         val code = compiler.exec(collector, Services.EMPTY, parsed)
         out.deleteRecursively()
+        if (System.getProperty("hooks.debug") != null) msgs.forEach { System.err.println("FIXTURE $it") }
         return code to msgs
     }
 
@@ -49,9 +50,9 @@ internal object Fixtures {
         .sortedBy { it.line }
         .map { "${it.severity.presentableName}:${it.file}:${it.line}:${it.text.substring(0, 4)}" }
 
-    /** Expected diagnostics from `// E1 error`, `// E1 warning`, `// E2 error`, `// B5 warning` markers in a fixture. */
+    /** Expected diagnostics from `// E1 error`, `// E1 warning`, `// E2 error`, `// E3 error`, `// B5 warning` markers in a fixture. */
     fun expected(fixture: String): List<String> = File(dir, fixture).readLines().mapIndexedNotNull { i, line ->
-        Regex("""// (E1|E2|B5) (error|warning)""").find(line)?.let { "${it.groupValues[2]}:$fixture:${i + 1}:[${it.groupValues[1]}]" }
+        Regex("""// (E1|E2|E3|B5) (error|warning)""").find(line)?.let { "${it.groupValues[2]}:$fixture:${i + 1}:[${it.groupValues[1]}]" }
     }
 
     private fun CompilerMessageSeverity.isErr() = this == CompilerMessageSeverity.ERROR || this == CompilerMessageSeverity.EXCEPTION

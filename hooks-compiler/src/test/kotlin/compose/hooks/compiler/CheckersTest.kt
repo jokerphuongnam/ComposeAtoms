@@ -51,6 +51,16 @@ class CheckersTest {
 
     @Test fun e1MoreCustomHookWarnings() = check("E1_more_warn.kt", ExitCode.OK)
 
+    @Test fun e1ShortCircuitPositionsReported() {
+        assertEquals(6, expected("E1_short_bad.kt").size)
+        check("E1_short_bad.kt", ExitCode.COMPILATION_ERROR)
+    }
+
+    @Test fun e1AlwaysEvaluatedPositionsAllowed() {
+        assertEquals(emptyList<String>(), expected("E1_short_ok.kt"))
+        check("E1_short_ok.kt", ExitCode.OK)
+    }
+
     // E2 CONTEXT_WITHOUT_PROVIDER
     @Test fun e2MissingProviderSameFile() {
         assertEquals(listOf("error:E2.kt:10:[E2]"), expected("E2.kt"))
@@ -58,6 +68,22 @@ class CheckersTest {
     }
 
     @Test fun e2OnlyFilePrivateUndefaultedUnprovidedContexts() = check("E2_more.kt", ExitCode.COMPILATION_ERROR)
+
+    @Test fun e2HooksTestFakesCountAsProviders() {
+        assertEquals(listOf("error:E2_provide.kt:12:[E2]"), expected("E2_provide.kt"))
+        check("E2_provide.kt", ExitCode.COMPILATION_ERROR)
+    }
+
+    // E3 UNSTABLE_CACHE_KEY
+    @Test fun e3UnstableKeysInHookBodies() {
+        assertEquals(6, expected("E3.kt").size)
+        check("E3.kt", ExitCode.COMPILATION_ERROR)
+    }
+
+    @Test fun e3TimeRandomIdSourcesAndTheirStableNeighbours() {
+        assertEquals(10, expected("E3_more.kt").size)
+        check("E3_more.kt", ExitCode.COMPILATION_ERROR)
+    }
 
     // B5 LENT_CONTEXT_ESCAPES
     @Test fun b5LendingLeakWarnings() {
