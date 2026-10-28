@@ -11,6 +11,7 @@ import kotlinx.coroutines.cancel
 /** Receiver of a [rememberEffect] block: a [CoroutineScope] whose Job is cancelled before the cleanup runs. */
 class EffectScope internal constructor(private val owner: RememberScope) : CoroutineScope {
     private var context: CoroutineContext? = null
+    /** The effect's own Job, a child of the hook scope: cancelled when the effect re-runs (deps changed) or its owner is cleared. */
     override val coroutineContext: CoroutineContext
         get() = context ?: owner.coroutineScope.coroutineContext.let { parent ->
             parent + Job(parent[Job])

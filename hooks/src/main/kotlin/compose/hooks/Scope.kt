@@ -172,6 +172,7 @@ class RememberScope internal constructor(@PublishedApi internal val name: String
 
     /** Test/inspection only. */
     fun debugChildCount(): Int = children?.size ?: 0
+    /** Inspection only: number of hook slots in this scope. */
     fun debugSlotCount(): Int = slots.size
 }
 

@@ -14,14 +14,20 @@ import kotlinx.coroutines.launch
 class ReducerState<S, A> @PublishedApi internal constructor(initial: S) {
     internal val state: MutableState<S> = mutableStateOf(initial, structuralEqualityPolicy())
     @PublishedApi internal var reducer: (S, A) -> S = { s, _ -> s }
+
+    /** The current state (observable: reading it in composition subscribes). */
     val value: S get() = state.value
+    /** Applies the reducer to the current state and [action]; stable for the hook's lifetime. */
     val dispatch: (A) -> Unit = { action ->
         Snapshot.withMutableSnapshot { state.value = reducer(state.value, action) }
     }
+    /** `val (state, dispatch) = rememberReducer(...)`: [value]. */
     operator fun component1(): S = value
+    /** `val (state, dispatch) = rememberReducer(...)`: [dispatch]. */
     operator fun component2(): (A) -> Unit = dispatch
 }
 
+/** Reducer state (React `useReducer`). [init] runs once; the latest [reducer] is used for every dispatch. */
 @Composable
 inline fun <S, A> rememberReducer(noinline reducer: (S, A) -> S, init: () -> S): ReducerState<S, A> =
     withRememberScope("rememberReducer") { scope ->
@@ -42,9 +48,14 @@ inline fun <T> rememberMemo(vararg deps: Any?, compute: () -> T): T =
         box.value
     }
 
-/** Mutable, non-observable reference (React `useRef`). Writing [current] never recomposes. */
+/**
+ * Mutable, non-observable reference (React `useRef`). Writing [current] never recomposes.
+ *
+ * @property current the held value.
+ */
 class Ref<T>(var current: T)
 
+/** A [Ref] created once with [init] (React `useRef`); the same instance for the hook's lifetime. */
 @Composable
 inline fun <T> rememberRef(init: () -> T): Ref<T> =
     withRememberScope("rememberRef") { scope -> scope.slot { Ref(init()) } }

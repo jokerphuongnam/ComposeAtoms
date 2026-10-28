@@ -14,12 +14,22 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * - a consumer keeps its reference only while the consumer's owner lives, and drops it when cleared;
  * - when the provider's owner is cleared the lease is revoked, and a consumer that still reads it fails fast
  *   instead of silently keeping a dead screen's object alive.
+ *
+ * @property name the name given to [rememberContextOf] (in errors and `toString()`).
  */
 class RememberContext<T> internal constructor(val name: String, internal val default: (() -> T)?) {
     internal val local: ProvidableCompositionLocal<Lease<T>?> = staticCompositionLocalOf { null }
+    /** `RememberContext(name)`. */
     override fun toString(): String = "RememberContext($name)"
 }
 
+/**
+ * Creates a context. Create it once, at top level (`val Theme = rememberContextOf<Theme>("Theme")`).
+ *
+ * @param name shown in errors and in `toString()`.
+ * @param default the value read when there is no provider; without it, reading with no provider throws
+ *   [MissingProviderException] (and the compiler plugin reports E2 in the same file).
+ */
 fun <T> rememberContextOf(name: String = "RememberContext", default: (() -> T)? = null): RememberContext<T> =
     RememberContext(name, default)
 
