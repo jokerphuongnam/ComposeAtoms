@@ -6,7 +6,7 @@ import org.junit.Test
 
 /** Atom, AtomState, AtomStore (plain, no composition). */
 class AtomTest {
-    private fun atom(store: AtomStore = AtomStore(), id: Any = "id", create: () -> Int): Atom<Int> = Atom(store, id, create)
+    private fun atom(store: AtomStore = AtomStore(), id: Any = "id", create: () -> Int): Atom<Int> = Atom(store, id, create = create)
 
     @Test fun readCreatesLazilyAndOnlyOnce() {
         var creates = 0

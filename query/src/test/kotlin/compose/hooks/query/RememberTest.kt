@@ -27,22 +27,22 @@ internal data class QProfile(val name: String)
 @OptIn(ExperimentalCoroutinesApi::class)
 class RememberTest {
     private lateinit var host: Host
-    private lateinit var previousScope: CoroutineScope
+    private lateinit var previousConfig: QueryConfig
 
     @Before fun setUp() {
         Dispatchers.setMain(Dispatchers.Unconfined)
-        previousScope = cacheScope
-        cacheScope = CoroutineScope(Dispatchers.Unconfined)
+        previousConfig = QueryConfig.global
+        QueryConfig.global = QueryConfig(Dispatchers.Unconfined)
         host = Host()
     }
 
     @After fun tearDown() {
         host.close()
-        cacheScope = previousScope
+        QueryConfig.global = previousConfig
         Dispatchers.resetMain()
     }
 
-    private fun atom(init: Int = 0) = Atom(AtomStore(), "r", { init })
+    private fun atom(init: Int = 0) = Atom(AtomStore(), "r") { init }
 
     @Test fun writeRecomposesReader() {
         val a = atom(1)
