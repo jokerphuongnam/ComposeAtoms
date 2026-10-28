@@ -14,7 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import compose.hooks.Provider
 import compose.hooks.customRemember
-import compose.hooks.hookContextOf
+import compose.hooks.rememberContextOf
 import compose.hooks.rememberContext
 import compose.hooks.rememberEffect
 import compose.hooks.rememberFlow
@@ -32,7 +32,7 @@ import kotlinx.coroutines.launch
 data class Theme(val name: String)
 data class Wizard(val title: String)
 
-val LocalTheme = hookContextOf<Theme>("Theme") { Theme("default") }
+val LocalTheme = rememberContextOf<Theme>("Theme") { Theme("default") }
 
 object DemoLog {
     val lines = ArrayList<String>()

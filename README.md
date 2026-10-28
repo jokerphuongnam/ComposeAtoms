@@ -56,7 +56,7 @@ fun ProfileScreen() {
   If the block returns a `() -> Unit`, it is the cleanup.
   **Pitfall:** `launch { }` followed by `{ cleanup }` on the next line is parsed as a second trailing lambda — write
   `val cleanup = { ... }; cleanup`.
-- `hookContextOf<T>(name, default?)`, `ctx.Provider(value) { }`, `rememberContext(ctx)` — lending context:
+- `rememberContextOf<T>(name, default?)`, `ctx.Provider(value) { }`, `rememberContext(ctx)` — lending context:
   the lease is revoked when the provider's scope clears (`RevokedContextException`);
   no provider and no default → `MissingProviderException`.
 - React hooks: `rememberReducer`, `rememberMemo(vararg deps)`, `rememberRef`, `rememberUpdated`,
@@ -87,7 +87,7 @@ plugins { id("compose.hooks") }   // or kotlinCompilerPluginClasspath(project(":
 ```
 
 - `[E1]` hook called conditionally (error) / in a loop without `key` (warning)
-- `[E2]` `hookContextOf` without default and no `Provider` in the same file (error)
+- `[E2]` `rememberContextOf` without default and no `Provider` in the same file (error)
 - `[B5]` lent context escaping into `GlobalScope.launch/async`, `thread {}`, `Thread {}` (warning)
 
 Not done yet: P1 transforms (auto-key etc. — runtime fallback is used), cross-file E2 / cycle detection.

@@ -73,6 +73,7 @@ internal fun FirFunctionCall.callableId(): CallableId? = calleeReference.toResol
 
 private fun CallableId.isSlotHook() = SLOT_HOOKS[packageName]?.contains(callableName.asString()) == true
 private fun CallableId.isCustomRemember() = packageName == HOOKS && callableName.asString() == "customRemember"
+private fun CallableId.isContextFactory() = packageName == HOOKS && callableName.asString() == "rememberContextOf"
 private fun CallableId.isKey() = packageName == COMPOSE_RUNTIME && callableName.asString() == "key"
 
 /**
@@ -88,6 +89,7 @@ object RulesOfHooksChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
         val name = id.callableName.asString()
         val slot = id.isSlotHook()
         val customHook = !slot && name.startsWith("remember") && !id.isCustomRemember() &&
+            !id.isContextFactory() && // rememberContextOf creates a context object; it takes no slot
             id.packageName != COMPOSE_RUNTIME // compose's own remember{} is positional by design
         if (!slot && !customHook) return
 
@@ -149,7 +151,7 @@ private fun FirFunctionCall.isRememberContext(): Boolean {
 
 /**
  * E2 (partial, same file): `rememberContext(Ctx)` where `Ctx` is a private top-level property of this file,
- * initialised by `hookContextOf(...)` without a default, and no `Ctx.Provider(...)` appears in this file.
+ * initialised by `rememberContextOf(...)` without a default, and no `Ctx.Provider(...)` appears in this file.
  */
 object MissingProviderChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
     @OptIn(SymbolInternals::class)
@@ -164,7 +166,7 @@ object MissingProviderChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
         if (decl.visibility != Visibilities.Private) return
         val init = decl.initializer as? FirFunctionCall ?: return
         val initId = init.callableId() ?: return
-        if (initId.packageName != HOOKS || initId.callableName.asString() != "hookContextOf") return
+        if (initId.packageName != HOOKS || initId.callableName.asString() != "rememberContextOf") return
         if (init.arguments.size >= 2) return // a default is given
         if (providedIn(file).contains(prop)) return
         reporter.reportOn(expression.source, HooksErrors.CONTEXT_WITHOUT_PROVIDER, prop.name.asString(), context)

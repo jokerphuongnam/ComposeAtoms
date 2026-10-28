@@ -1,10 +1,10 @@
 package fixture
 import compose.hooks.*
 
-private val Missing = hookContextOf<String>("Missing")
-private val WithDefault = hookContextOf<String>("D") { "d" }
-private val Provided = hookContextOf<String>("P")
-val Public = hookContextOf<String>("Public")
+private val Missing = rememberContextOf<String>("Missing")
+private val WithDefault = rememberContextOf<String>("D") { "d" }
+private val Provided = rememberContextOf<String>("P")
+val Public = rememberContextOf<String>("Public")
 
 fun e2() = customRemember {
     rememberContext(Missing)       // E2 error

@@ -279,7 +279,7 @@ inline fun <R> customRemember(key: Any? = null, name: String = "customRemember",
 /** The scope of the innermost [customRemember] on this restart scope, or a fresh implicit one for a bare hook call. */
 @PublishedApi
 @Composable
-internal fun currentHookScope(): RememberScope? {
+internal fun currentRememberScope(): RememberScope? {
     val active = ScopeStack.peek()
     return if (active != null && active.rs === currentRecomposeScope) active else null
 }
@@ -291,7 +291,7 @@ internal fun currentHookScope(): RememberScope? {
  */
 @Composable
 @PublishedApi
-internal inline fun <R> withHookScope(name: String, block: (RememberScope) -> R): R {
-    val active = currentHookScope()
+internal inline fun <R> withRememberScope(name: String, block: (RememberScope) -> R): R {
+    val active = currentRememberScope()
     return if (active != null) block(active) else customRemember(name = name) { block(ScopeStack.peek()!!) }
 }

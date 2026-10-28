@@ -87,7 +87,7 @@ internal class EffectState(private val owner: RememberScope) {
 @Composable
 @NonRestartableComposable
 fun <R> rememberEffect(vararg deps: Any?, block: EffectScope.() -> R) {
-    withHookScope("rememberEffect") { scope ->
+    withRememberScope("rememberEffect") { scope ->
         val effect = scope.slot { EffectState(scope).also { scope.addEffect(it) } }
         if (effect.needsRun(deps)) {
             effect.pendingDeps = deps

@@ -24,7 +24,7 @@ class ReducerState<S, A> @PublishedApi internal constructor(initial: S) {
 
 @Composable
 inline fun <S, A> rememberReducer(noinline reducer: (S, A) -> S, init: () -> S): ReducerState<S, A> =
-    withHookScope("rememberReducer") { scope ->
+    withRememberScope("rememberReducer") { scope ->
         scope.slot { ReducerState<S, A>(init()) }.also { it.reducer = reducer }
     }
 
@@ -33,7 +33,7 @@ inline fun <S, A> rememberReducer(noinline reducer: (S, A) -> S, init: () -> S):
 /** Memoized value (React `useMemo`): recomputed only when [deps] change (`contentEquals`). */
 @Composable
 inline fun <T> rememberMemo(vararg deps: Any?, compute: () -> T): T =
-    withHookScope("rememberMemo") { scope ->
+    withRememberScope("rememberMemo") { scope ->
         val box = scope.slot { MemoBox(deps, compute()) }
         if (!box.deps.contentEquals(deps)) {
             box.value = compute()
@@ -47,12 +47,12 @@ class Ref<T>(var current: T)
 
 @Composable
 inline fun <T> rememberRef(init: () -> T): Ref<T> =
-    withHookScope("rememberRef") { scope -> scope.slot { Ref(init()) } }
+    withRememberScope("rememberRef") { scope -> scope.slot { Ref(init()) } }
 
 /** Always holds the latest [value] (for long-lived callbacks / effects that must not restart). */
 @Composable
 fun <T> rememberUpdated(value: T): State<T> =
-    withHookScope("rememberUpdated") { scope ->
+    withRememberScope("rememberUpdated") { scope ->
         scope.slot { mutableStateOf(value) }.also { it.value = value }
     }
 
@@ -62,7 +62,7 @@ fun <T> rememberUpdated(value: T): State<T> =
  */
 @Composable
 fun <T> rememberFlow(flow: Flow<T>, initial: T, vararg keys: Any?): State<T> =
-    withHookScope("rememberFlow") { scope ->
+    withRememberScope("rememberFlow") { scope ->
         val state = scope.slot { mutableStateOf(initial) }
         rememberEffect(flow, *keys) {
             launch { flow.collect { state.value = it } }
@@ -75,4 +75,4 @@ fun <T> rememberFlow(flow: Flow<T>, initial: T, vararg keys: Any?): State<T> =
 /** Stable unique id for this hook instance (React `useId`), stable across recomposition, reshow and rotation. */
 @Composable
 fun rememberId(prefix: String = "h"): String =
-    withHookScope("rememberId") { scope -> scope.slot { prefix + idCounter.incrementAndGet() } }
+    withRememberScope("rememberId") { scope -> scope.slot { prefix + idCounter.incrementAndGet() } }

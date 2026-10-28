@@ -4,7 +4,7 @@ import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlin.concurrent.thread
 
-private val Session = hookContextOf<StringBuilder>("Session") { StringBuilder() }
+private val Session = rememberContextOf<StringBuilder>("Session") { StringBuilder() }
 
 fun b5() = customRemember {
     val session = rememberContext(Session)

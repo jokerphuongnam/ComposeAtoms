@@ -22,7 +22,7 @@ import androidx.compose.runtime.structuralEqualityPolicy
 inline fun <T> rememberState(
     policy: SnapshotMutationPolicy<T> = structuralEqualityPolicy(),
     init: () -> T,
-): MutableState<T> = withHookScope("rememberState") { scope -> scope.slot { mutableStateOf(init(), policy) } }
+): MutableState<T> = withRememberScope("rememberState") { scope -> scope.slot { mutableStateOf(init(), policy) } }
 
 /**
  * Value form: `var name by rememberState("guest")`. Only the first value is stored.
@@ -34,7 +34,7 @@ inline fun <T> rememberState(
 @Composable
 @JvmName("rememberStateValue")
 fun <T> rememberState(value: T): MutableState<T> =
-    withHookScope("rememberState") { scope -> scope.slot { mutableStateOf(value, structuralEqualityPolicy()) } }
+    withRememberScope("rememberState") { scope -> scope.slot { mutableStateOf(value, structuralEqualityPolicy()) } }
 
 /** Functional updater (React `setState(prev => next)`); atomic w.r.t. other snapshot writes on the same thread. */
 inline fun <T> MutableState<T>.update(transform: (T) -> T) {

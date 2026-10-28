@@ -1,17 +1,17 @@
 package compose.hooks.query
 
 import androidx.compose.runtime.Composable
-import compose.hooks.HookContext
+import compose.hooks.RememberContext
 import compose.hooks.Provider
-import compose.hooks.hookContextOf
+import compose.hooks.rememberContextOf
 import compose.hooks.rememberContext
 
-private val parentContexts = HashMap<String, HookContext<Any>>()
+private val parentContexts = HashMap<String, RememberContext<Any>>()
 
-/** The core [HookContext] used for [T] by [ParentState] / [rememberParentState]. */
+/** The core [RememberContext] used for [T] by [ParentState] / [rememberParentState]. */
 @Suppress("UNCHECKED_CAST")
-fun <T : Any> parentContext(type: String): HookContext<T> = synchronized(parentContexts) {
-    parentContexts.getOrPut(type) { hookContextOf<Any>("ParentState<$type>") } as HookContext<T>
+fun <T : Any> parentContext(type: String): RememberContext<T> = synchronized(parentContexts) {
+    parentContexts.getOrPut(type) { rememberContextOf<Any>("ParentState<$type>") } as RememberContext<T>
 }
 
 /**
@@ -19,7 +19,7 @@ fun <T : Any> parentContext(type: String): HookContext<T> = synchronized(parentC
  * [value]. Built on core `rememberContext`: the value is lent — it lives with the provider's owner, a child keeps
  * it only while the child's owner lives, and reading it after the provider's owner was cleared fails fast.
  *
- * Note: core `hookContextOf<T>()` + `Provider` + `rememberContext` cover the same need with an explicit,
+ * Note: core `rememberContextOf<T>()` + `Provider` + `rememberContext` cover the same need with an explicit,
  * typed context object (several contexts of one type are possible).
  */
 @Composable

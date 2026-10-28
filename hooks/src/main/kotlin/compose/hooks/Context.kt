@@ -15,23 +15,23 @@ import androidx.compose.runtime.staticCompositionLocalOf
  * - when the provider's owner is cleared the lease is revoked, and a consumer that still reads it fails fast
  *   instead of silently keeping a dead screen's object alive.
  */
-class HookContext<T> internal constructor(val name: String, internal val default: (() -> T)?) {
+class RememberContext<T> internal constructor(val name: String, internal val default: (() -> T)?) {
     internal val local: ProvidableCompositionLocal<Lease<T>?> = staticCompositionLocalOf { null }
-    override fun toString(): String = "HookContext($name)"
+    override fun toString(): String = "RememberContext($name)"
 }
 
-fun <T> hookContextOf(name: String = "HookContext", default: (() -> T)? = null): HookContext<T> =
-    HookContext(name, default)
+fun <T> rememberContextOf(name: String = "RememberContext", default: (() -> T)? = null): RememberContext<T> =
+    RememberContext(name, default)
 
 /** Thrown when a context is read without a provider and has no default (compile-time check E2 covers the same file). */
-class MissingProviderException(context: HookContext<*>) :
+class MissingProviderException(context: RememberContext<*>) :
     IllegalStateException("No provider for $context. Wrap the caller in $context.Provider(value) { ... } or give it a default.")
 
 /** Thrown when a lent value is read after its provider's owner was cleared. */
-class RevokedContextException(context: HookContext<*>) :
+class RevokedContextException(context: RememberContext<*>) :
     IllegalStateException("$context was read after its provider's owner was cleared (the lent value is gone).")
 
-internal class Lease<T>(val context: HookContext<T>, initial: T) {
+internal class Lease<T>(val context: RememberContext<T>, initial: T) {
     private val state: MutableState<T> = mutableStateOf(initial, referentialEqualityPolicy())
     var revoked = false
         private set
@@ -60,8 +60,8 @@ internal class ConsumerRef<T> {
  * Provides [value] to [content]. The provider's hook scope owns the lease: it is revoked when that scope is cleared.
  */
 @Composable
-fun <T> HookContext<T>.Provider(value: T, content: @Composable () -> Unit) {
-    val lease = withHookScope("Provider($name)") { scope ->
+fun <T> RememberContext<T>.Provider(value: T, content: @Composable () -> Unit) {
+    val lease = withRememberScope("Provider($name)") { scope ->
         scope.slot { Lease(this, value).also { l -> scope.onClear { l.revoke() } } }
     }
     lease.value = value
@@ -74,9 +74,9 @@ fun <T> HookContext<T>.Provider(value: T, content: @Composable () -> Unit) {
  * compiler plugin warns about that (B5).
  */
 @Composable
-fun <T> rememberContext(context: HookContext<T>): T {
+fun <T> rememberContext(context: RememberContext<T>): T {
     val lease = context.local.current
-    return withHookScope("rememberContext(${context.name})") { scope ->
+    return withRememberScope("rememberContext(${context.name})") { scope ->
         val ref = scope.slot { ConsumerRef<T>().also { r -> scope.onClear { r.lease = null } } }
         if (lease == null) {
             ref.lease = null
@@ -89,4 +89,4 @@ fun <T> rememberContext(context: HookContext<T>): T {
 }
 
 /** Test / inspection helpers. */
-internal fun <T> HookContext<T>.debugCurrentLease(ref: Any?): Any? = (ref as? ConsumerRef<*>)?.lease
+internal fun <T> RememberContext<T>.debugCurrentLease(ref: Any?): Any? = (ref as? ConsumerRef<*>)?.lease

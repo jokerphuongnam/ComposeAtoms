@@ -314,7 +314,7 @@ class CoreTests {
     }
 
     // ---------------------------------------------------------------- context lending L1-L4
-    private val Ctx = hookContextOf<Box>("Box")
+    private val Ctx = rememberContextOf<Box>("Box")
 
     @Test fun contextL1toL4() {
         val provOwner = FakeOwner()
@@ -355,7 +355,7 @@ class CoreTests {
         var err: Throwable? = null
         try { host.show(owner) { rememberContext(Ctx) } } catch (t: Throwable) { err = t }
         assertTrue(err is MissingProviderException)
-        val withDefault = hookContextOf("D") { Box("default") }
+        val withDefault = rememberContextOf("D") { Box("default") }
         var got: Box? = null
         host.show(FakeOwner()) { got = rememberContext(withDefault) }
         assertEquals("default", got!!.name)
