@@ -14,6 +14,11 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ComposeAtoms"
-include(":atoms")
+rootProject.name = "ComposeHooks"
+include(":hooks")
+include(":query")
+include(":hooks-compiler")
+include(":hooks-gradle-plugin")
+include(":hooks-test")
+include(":query-test")
 include(":example")

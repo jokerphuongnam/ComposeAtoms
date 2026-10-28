@@ -3,3 +3,7 @@ build/
 local.properties
 *.iml
 .idea/
+.kotlin/
+.DS_Store
+captures/
+.cxx/
