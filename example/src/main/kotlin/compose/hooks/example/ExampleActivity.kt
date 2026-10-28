@@ -20,7 +20,8 @@ class ExampleActivity : ComponentActivity() {
 fun ExampleApp() {
     val nav = rememberNavController()
     NavHost(nav, startDestination = "profile") {
-        composable("profile") { ProfileScreen(onOpenHooks = { nav.navigate("hooks") }) }
+        composable("profile") { ProfileScreen(onOpenHooks = { nav.navigate("hooks") }, onOpenFeed = { nav.navigate("feed") }) }
+        composable("feed") { FeedScreen(onBack = { nav.popBackStack() }) }
         composable("hooks") { HooksDemoScreen(onBack = { nav.popBackStack() }) }
     }
 }

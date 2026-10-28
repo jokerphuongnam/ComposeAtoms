@@ -17,7 +17,6 @@ import compose.hooks.customRemember
 import compose.hooks.rememberEffect
 import compose.hooks.rememberState
 import compose.hooks.query.cache
-import compose.hooks.query.globalState
 import compose.hooks.query.rememberCache
 import compose.hooks.query.rememberGlobalState
 import compose.hooks.query.rememberShareState
@@ -50,22 +49,22 @@ class ProfileForm(
 
 @Composable
 fun rememberProfileForm() = customRemember {
-    val session by rememberGlobalState { Session("Ada") }
+    val sessionState = rememberGlobalState { Session("Ada") }
     val profile = rememberCache(profileQuery)
     var name by rememberState("")
     rememberEffect(profile.data) { profile.data?.let { name = it.name } }
     ProfileForm(
-        session = session,
+        session = sessionState.value,
         loading = profile.isFetching,
         name = name,
         onName = { name = it },
-        onRefresh = { profileQuery.refetch() },
-        onLogin = { globalState { Session("Ada") }.write(Session(it)) },
+        onRefresh = { profile.refetch() },
+        onLogin = { sessionState.set(Session(it)) }, // the session atom of the current client
     )
 }
 
 @Composable
-fun ProfileScreen(onOpenHooks: () -> Unit) {
+fun ProfileScreen(onOpenHooks: () -> Unit, onOpenFeed: () -> Unit = {}) {
     val form = rememberProfileForm()
     val note = rememberShareState("note") { Note("") }
     Column(Modifier.fillMaxSize().padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -77,5 +76,6 @@ fun ProfileScreen(onOpenHooks: () -> Unit) {
         Text("Note: ${note.value.text}", Modifier.testTag("note"))
         Button(onClick = { note.update { it.copy(text = it.text + "+") } }, Modifier.testTag("appendNote")) { Text("Append to shared note") }
         Button(onClick = onOpenHooks, Modifier.testTag("openHooks")) { Text("Open core hooks demo") }
+        Button(onClick = onOpenFeed, Modifier.testTag("openFeed")) { Text("Open feed (screen-scoped QueryClient)") }
     }
 }
