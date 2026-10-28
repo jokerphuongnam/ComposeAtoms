@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("maven-publish")
+    id("org.jetbrains.dokka") // `dokkaHtml`: KDoc check (reportUndocumented); the AAR javadoc jar comes from AGP
     id("org.jetbrains.kotlinx.kover")
 }
 
@@ -20,9 +21,6 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
 
     testOptions {
         unitTests.isReturnDefaultValues = true
@@ -31,6 +29,7 @@ android {
     publishing {
         singleVariant("release") {
             withSourcesJar()
+            withJavadocJar()
         }
     }
 }
@@ -52,18 +51,21 @@ afterEvaluate {
     publishing {
         publications {
             create<MavenPublication>("release") {
-                groupId = "compose.hooks"
                 artifactId = "query"
-                version = "0.1.0"
                 from(components["release"])
             }
         }
     }
 }
 
+kotlin {
+    compilerOptions.jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+}
+
 dependencies {
     api(project(":hooks"))
 
+    testImplementation(project(":query-test")) // dogfooding: runQueryTest / renderHook
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("androidx.compose.ui:ui:1.7.6") // LocalView for the no-ViewModelStoreOwner (inspection) path
