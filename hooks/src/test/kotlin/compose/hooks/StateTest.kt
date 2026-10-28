@@ -8,157 +8,102 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.referentialEqualityPolicy
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.setMain
-import org.junit.After
+import compose.hooks.test.runHookTest
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotSame
 import org.junit.Assert.assertSame
-import org.junit.Before
 import org.junit.Test
 
-/** rememberState (lambda + value form), policies, update, destructuring, callback stability. */
-@OptIn(ExperimentalCoroutinesApi::class)
+/**
+ * rememberState (lambda + value form), policies, update, destructuring, callback stability.
+ * Written with hooks-test (dogfooding): runHookTest fails on any Hooks.onError report.
+ */
 class StateTest {
-    private lateinit var host: Host
-
-    @Before fun setUp() {
-        Dispatchers.setMain(Dispatchers.Unconfined)
-        host = Host()
-        Hooks.onError = { throw it }
-    }
-
-    @After fun tearDown() {
-        host.close()
-        Dispatchers.resetMain()
-    }
-
-    @Test fun stateSurvivesRecompositionReshowAndRecreate_initOnce() {
-        val owner = FakeOwner()
+    @Test fun stateSurvivesRecompositionReshowAndRecreate_initOnce() = runHookTest {
+        val owner = backStackEntry()
         var inits = 0
-        var seen: MutableState<Int>? = null
-        val content: @Composable () -> Unit = { seen = rememberState { inits++; 1 } }
-        host.show(owner, content)
-        val first = seen!!
-        host.act { first.value = 5 }
-        host.show(owner, content) // reshow / rotation: new composition, same owner
-        assertSame(first, seen)
-        assertEquals(5, seen!!.value)
+        val result = renderHook(owner) { rememberState { inits++; 1 } }
+        val first = result.current
+        result.act { first.value = 5 }
+        result.recreate() // rotation: new composition, same owner
+        assertSame(first, result.current)
+        assertEquals(5, result.current.value)
         assertEquals(1, inits)
         owner.pop()
-        val other = FakeOwner()
-        host.show(other, content)
-        assertNotSame(first, seen)
+        val other = renderHook { rememberState { inits++; 1 } }
+        assertNotSame(first, other.current)
         assertEquals(2, inits)
     }
 
-    @Test fun writeTriggersRecompositionOfReaders() {
-        val owner = FakeOwner()
-        val rendered = ArrayList<Int>()
-        var state: MutableState<Int>? = null
-        host.show(owner) {
-            val s = rememberState { 0 }
-            state = s
-            rendered += s.value
-        }
-        host.act { state!!.value = 1 }
-        host.act { state!!.value = 2 }
-        assertEquals(listOf(0, 1, 2), rendered)
+    @Test fun writeTriggersRecompositionOfReaders() = runHookTest {
+        val result = renderHook { val s = rememberState { 0 }; s to s.value }
+        result.act { result.current.first.value = 1 }
+        result.act { result.current.first.value = 2 }
+        assertEquals(listOf(0, 1, 2), result.history.map { it.second })
     }
 
-    @Test fun delegatedPropertyForm() {
-        val owner = FakeOwner()
-        var bump: (() -> Unit)? = null
-        val rendered = ArrayList<Int>()
-        host.show(owner) {
+    @Test fun delegatedPropertyForm() = runHookTest {
+        val result = renderHook {
             var count by rememberState { 10 }
-            rendered += count
-            bump = { count++ }
+            count to { count++ }
         }
-        host.act { bump!!() }
-        host.act { bump!!() }
-        assertEquals(listOf(10, 11, 12), rendered)
+        result.act { result.current.second() }
+        result.act { result.current.second() }
+        assertEquals(listOf(10, 11, 12), result.history.map { it.first })
     }
 
-    @Test fun valueFormStoresFirstValue_argumentStillEvaluatedEachPass() {
-        val owner = FakeOwner()
+    @Test fun valueFormStoresFirstValue_argumentStillEvaluatedEachPass() = runHookTest {
         var evaluated = 0
-        val trigger = mutableIntStateOf(0)
-        var state: MutableState<String>? = null
         fun arg(): String { evaluated++; return "v$evaluated" }
-        host.show(owner) {
-            trigger.intValue
-            state = rememberState(arg())
-        }
-        host.act { trigger.intValue++ }
-        host.act { trigger.intValue++ }
-        assertEquals("v1", state!!.value)
+        val result = renderHookWithProps(0) { _ -> rememberState(arg()) }
+        result.rerender(1)
+        result.rerender(2)
+        assertEquals("v1", result.current.value)
         assertEquals(3, evaluated) // documented: without the compiler plugin the argument runs every pass
+        assertEquals(3, result.recomposeCount)
     }
 
-    @Test fun valueFormInsideCustomRememberUsesTheSharedScope() {
-        val owner = FakeOwner()
-        var scope: RememberScope? = null
-        host.show(owner) {
+    @Test fun valueFormInsideCustomRememberUsesTheSharedScope() = runHookTest {
+        val owner = backStackEntry()
+        val result = renderHook(owner) {
             customRemember {
                 rememberState("a"); rememberState { "b" }
-                scope = ScopeStack.peek()
+                ScopeStack.peek()!!
             }
         }
-        assertEquals(2, scope!!.debugSlotCount())
-        assertEquals(1, debugTopScopeCount(owner))
+        assertEquals(2, result.current.debugSlotCount())
+        assertEquals(1, owner.hookScopeCount)
     }
 
-    @Test fun skipOnEqualAndBatching() {
-        val owner = FakeOwner()
-        var compositions = 0
+    @Test fun skipOnEqualAndBatching() = runHookTest {
         var state: MutableState<Int>? = null
-        host.show(owner) {
-            val s = rememberState { 0 }
-            state = s
-            s.value
-            compositions++
-        }
-        assertEquals(1, compositions)
-        host.act { state!!.value = 0 }
-        assertEquals("equal write must not recompose", 1, compositions)
-        host.act { state!!.value = 1; state!!.update { it + 1 }; state!!.update { it + 1 } }
-        assertEquals("three writes, one recomposition", 2, compositions)
+        val result = renderHook { val s = rememberState { 0 }; state = s; s.value }
+        assertEquals(1, result.recomposeCount)
+        result.act { state!!.value = 0 }
+        assertEquals("equal write must not recompose", 1, result.recomposeCount)
+        result.act { state!!.value = 1; state!!.update { it + 1 }; state!!.update { it + 1 } }
+        assertEquals("three writes, one recomposition", 2, result.recomposeCount)
         assertEquals(3, state!!.value)
         val (value, set) = state!!
         assertEquals(3, value)
-        host.act { set(4) }
+        result.act { set(4) }
         assertEquals(4, state!!.value)
     }
 
-    @Test fun structuralPolicyIsDefault_customPoliciesHonoured() {
+    @Test fun structuralPolicyIsDefault_customPoliciesHonoured() = runHookTest {
         data class P(val x: Int)
-        val owner = FakeOwner()
-        var structural: MutableState<P>? = null
-        var referential: MutableState<P>? = null
-        var never: MutableState<Int>? = null
-        val counts = IntArray(3)
-        host.show(owner) {
-            customRemember { val s = rememberState { P(1) }; structural = s; s.value; counts[0]++ }
-        }
-        host.show(owner) {
-            customRemember { val s = rememberState(referentialEqualityPolicy()) { P(1) }; referential = s; s.value; counts[1]++ }
-        }
-        host.act { referential!!.value = P(1) }
-        assertEquals("referential: equal-but-new instance recomposes", 2, counts[1])
-        host.show(owner) {
-            customRemember { val s = rememberState(neverEqualPolicy()) { 1 }; never = s; s.value; counts[2]++ }
-        }
-        host.act { never!!.value = 1 }
-        assertEquals("neverEqual: same value recomposes", 2, counts[2])
-        host.show(owner) {
-            customRemember { val s = rememberState { P(1) }; structural = s; s.value; counts[0]++ }
-        }
-        val before = counts[0]
-        host.act { structural!!.value = P(1) }
-        assertEquals("structural: equal value skipped", before, counts[0])
+        val owner = backStackEntry()
+        val referential = renderHook(owner) { customRemember { rememberState(referentialEqualityPolicy()) { P(1) }.also { it.value } } }
+        referential.act { referential.current.value = P(1) }
+        assertEquals("referential: equal-but-new instance recomposes", 2, referential.recomposeCount)
+        referential.hide()
+        val never = renderHook(owner) { customRemember { rememberState(neverEqualPolicy()) { 1 }.also { it.value } } }
+        never.act { never.current.value = 1 }
+        assertEquals("neverEqual: same value recomposes", 2, never.recomposeCount)
+        never.hide()
+        val structural = renderHook(owner) { customRemember { rememberState { P(1) }.also { it.value } } }
+        structural.act { structural.current.value = P(1) }
+        assertEquals("structural: equal value skipped", 1, structural.recomposeCount)
     }
 
     @Test fun updateOnPlainMutableState() {
@@ -170,33 +115,31 @@ class StateTest {
     // ---------------------------------------------------------------- C2: callbacks capturing hook setters stay stable
     @Composable fun Child(onClick: () -> Unit, count: IntArray) { count[0]++; onClick.hashCode() }
 
-    @Test fun c2CallbackCapturingStateIsStable() {
-        val owner = FakeOwner()
+    @Test fun c2CallbackCapturingStateIsStable() = runHookTest {
         val tick = mutableIntStateOf(0)
         val childCount = IntArray(1)
-        host.show(owner) {
+        val result = renderHook {
             tick.intValue
             val s = rememberState { 0 }
             var v by rememberState { 0 }
             Child(onClick = { s.value++; v++ }, count = childCount)
         }
-        host.act { tick.intValue++ }
-        host.act { tick.intValue++ }
+        result.act { tick.intValue++ }
+        result.act { tick.intValue++ }
         assertEquals("child skipped: lambda capturing hook state is memoized (strong skipping)", 1, childCount[0])
     }
 
     /** Data point: MutableState.component2() returns a new lambda each call, so a callback capturing it is not memoized. */
-    @Test fun c2CallbackCapturingDestructuredSetterIsNotStable() {
-        val owner = FakeOwner()
+    @Test fun c2CallbackCapturingDestructuredSetterIsNotStable() = runHookTest {
         val tick = mutableIntStateOf(0)
         val childCount = IntArray(1)
-        host.show(owner) {
+        val result = renderHook {
             tick.intValue
             val (_, set) = rememberState { 0 }
             Child(onClick = { set(1) }, count = childCount)
         }
-        host.act { tick.intValue++ }
-        host.act { tick.intValue++ }
+        result.act { tick.intValue++ }
+        result.act { tick.intValue++ }
         assertEquals(3, childCount[0])
     }
 }
