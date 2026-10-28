@@ -7,6 +7,7 @@ import compose.hooks.rememberState
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
@@ -229,7 +230,9 @@ internal class CacheEntry<T>(
         val body = fetchBody
         isFetching = true
         publish()
-        job = cacheScope.launch {
+        // LAZY: `job` must point at this fetch before it can run (an immediate dispatcher would finish it first)
+        val launched = cacheScope.launch(start = CoroutineStart.LAZY) {
+            val self = coroutineContext[Job]
             try {
                 val value = body()
                 data = value
@@ -241,11 +244,16 @@ internal class CacheEntry<T>(
                 this@CacheEntry.error = error
                 status = CacheStatus.Error
             } finally {
-                isFetching = false
-                job = null
-                publish()
+                // a refetch may have replaced this (cancelled) fetch: leave the newer one's state alone
+                if (job === self) job = null
+                if (job == null) {
+                    isFetching = false
+                    publish()
+                }
             }
         }
+        job = launched
+        launched.start()
     }
 
     suspend fun awaitValue(): T {

@@ -10,3 +10,6 @@ fun <R> rememberEffect(vararg deps: Any?, block: () -> R) {}
 fun <T> rememberRef(init: () -> T): Array<T> = TODO()
 fun <T> rememberContext(context: RememberContext<T>): T = TODO()
 fun <T> RememberContext<T>.Provider(value: T, content: () -> Unit) {}
+fun rememberId(): String = ""
+fun interface Block { fun run() }
+fun takesBlock(block: Block) {}

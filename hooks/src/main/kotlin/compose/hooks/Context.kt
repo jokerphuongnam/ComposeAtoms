@@ -80,7 +80,9 @@ fun <T> rememberContext(context: RememberContext<T>): T {
         val ref = scope.slot { ConsumerRef<T>().also { r -> scope.onClear { r.lease = null } } }
         if (lease == null) {
             ref.lease = null
-            context.default?.invoke() ?: throw MissingProviderException(context)
+            // a default that returns null is still a default (nullable T); only a missing default is an error
+            val default = context.default ?: throw MissingProviderException(context)
+            default()
         } else {
             ref.lease = lease
             lease.value

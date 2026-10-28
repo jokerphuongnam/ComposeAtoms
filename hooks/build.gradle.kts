@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("maven-publish")
+    id("org.jetbrains.kotlinx.kover")
 }
 
 android {
@@ -34,6 +35,19 @@ android {
     }
 }
 
+// Coverage of the JVM unit tests (src/test) only. `./gradlew :hooks:koverVerifyDebug` fails below the bounds.
+kover {
+    reports {
+        variant("debug") {
+            verify {
+                rule("line coverage >= 95%") { minBound(95, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE) }
+                // regression guard: remaining partial branches are null-safety / defensive paths (see test report)
+                rule("branch coverage >= 80%") { minBound(80, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH) }
+            }
+        }
+    }
+}
+
 afterEvaluate {
     publishing {
         publications {
@@ -55,6 +69,7 @@ dependencies {
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+    testImplementation("androidx.compose.ui:ui:1.7.6") // LocalView for the no-ViewModelStoreOwner (inspection) path
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.1")

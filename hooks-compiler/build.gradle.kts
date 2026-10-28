@@ -1,5 +1,6 @@
 plugins {
     id("org.jetbrains.kotlin.jvm")
+    id("org.jetbrains.kotlinx.kover")
 }
 
 java {
@@ -28,4 +29,15 @@ tasks.test {
     systemProperty("hooks.plugin.jar", tasks.jar.get().archiveFile.get().asFile.absolutePath)
     maxHeapSize = "1g"
     if (project.hasProperty("hooksDebug")) systemProperty("hooks.debug", "1")
+}
+
+// Coverage of the unit tests (src/test) only. `./gradlew :hooks-compiler:koverVerify` fails below the bounds.
+kover {
+    reports {
+        verify {
+            rule("line coverage >= 95%") { minBound(95, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.LINE) }
+            // regression guard: remaining partial branches are null-safety / defensive paths (see test report)
+            rule("branch coverage >= 80%") { minBound(80, kotlinx.kover.gradle.plugin.dsl.CoverageUnit.BRANCH) }
+        }
+    }
 }

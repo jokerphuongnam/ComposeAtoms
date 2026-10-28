@@ -24,3 +24,9 @@ gradlePlugin {
         }
     }
 }
+
+// test-only: ProjectBuilder (gradleApi) + the Kotlin plugin API at test runtime; nothing here is published
+dependencies {
+    testImplementation("org.jetbrains.kotlin:kotlin-gradle-plugin-api:2.0.21")
+    testImplementation("junit:junit:4.13.2")
+}

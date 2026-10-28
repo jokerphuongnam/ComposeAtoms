@@ -69,7 +69,8 @@ internal class AtomStore {
         set.add(listener)
         return {
             set.remove(listener)
-            if (set.isEmpty()) listeners.remove(identity)
+            // only drop the set this handle belongs to: after remove(identity) a newer set may be registered
+            if (set.isEmpty() && listeners[identity] === set) listeners.remove(identity)
         }
     }
 }

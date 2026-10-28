@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composition
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
 import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.platform.LocalView
+import android.view.View
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
@@ -52,6 +54,18 @@ internal class Host {
         hide()
         composition = Composition(UnitApplier, recomposer).also {
             it.setContent { CompositionLocalProvider(LocalViewModelStoreOwner provides owner) { content() } }
+        }
+        frame()
+    }
+
+    /**
+     * Screen without a ViewModelStoreOwner (Preview / inspection): LocalViewModelStoreOwner falls back to the
+     * LocalView tree, and a bare View (android.jar stub, returnDefaultValues) has no owner -> hooks use `remember`.
+     */
+    fun showWithoutOwner(content: @Composable () -> Unit) {
+        hide()
+        composition = Composition(UnitApplier, recomposer).also {
+            it.setContent { CompositionLocalProvider(LocalView provides View(null)) { content() } }
         }
         frame()
     }

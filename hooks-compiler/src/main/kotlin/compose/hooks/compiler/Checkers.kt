@@ -78,7 +78,7 @@ private fun CallableId.isKey() = packageName == COMPOSE_RUNTIME && callableName.
 
 /**
  * E1 rules of hooks. Walks from the call up to the nearest enclosing customRemember block:
- * - slot hook under if/when branch, loop, try, or a repeating lambda (forEach/repeat/...) -> error (key() does not
+ * - slot hook under if/when branch, loop (body or condition), try/catch, or a repeating lambda (forEach/repeat/...) -> error (key() does not
  *   help: the slots still belong to the same scope);
  * - a custom hook named remember* (its own child scope) in a loop without key() -> warning (positional identity).
  * Calls outside customRemember are not checked: a bare hook gets its own implicit scope per call site.
@@ -105,8 +105,10 @@ object RulesOfHooksChecker : FirFunctionCallChecker(MppCheckerKind.Common) {
             val e = chain[i]
             when (e) {
                 is FirWhenBranch -> if (below === e.result) conditional = true
-                is FirLoop -> if (below === e.block) loop = true
-                is FirTryExpression -> if (below === e.tryBlock) conditional = true
+                // the loop condition is evaluated once per iteration too
+                is FirLoop -> if (below === e.block || below === e.condition) loop = true
+                // a catch block runs only on failure; finally runs on every pass
+                is FirTryExpression -> if (below === e.tryBlock || e.catches.any { it === below }) conditional = true
                 is FirSimpleFunction -> break
                 is FirAnonymousFunction -> {
                     // owner call of this lambda: the nearest FirFunctionCall above that takes it as an argument
