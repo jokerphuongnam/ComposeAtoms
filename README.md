@@ -1,10 +1,10 @@
-# ComposeHooks 1.0.0
+# ComposeHooks 1.0.1
 
 React-style hooks for Jetpack Compose with **owner lifetime**: hook state lives as long as the
 `ViewModelStoreOwner` (navigation back-stack entry / activity), not as long as one composition. A query layer
 (React Query / Jotai style), a K2 compiler plugin that checks the rules of hooks, and test kits.
 
-| Artifact (`compose.hooks:<name>:1.0.0`) | Package | What |
+| Artifact (`compose.hooks:<name>:1.0.1`) | Package | What |
 |---|---|---|
 | `hooks` (AAR) | `compose.hooks` | core: `customRemember` scope tree, `rememberState`, `rememberEffect`, `rememberContext`, React hooks |
 | `query` (AAR) | `compose.hooks.query` | `QueryClient`, `cache` / `rememberCache`, `seedCache`, `globalState`, `shareState`, `ParentState` (`api` on `hooks`) |
@@ -36,10 +36,10 @@ dependencyResolutionManagement {
 
 // module build.gradle.kts
 dependencies {
-    implementation("compose.hooks:hooks:1.0.0")
-    implementation("compose.hooks:query:1.0.0")
-    testImplementation("compose.hooks:hooks-test:1.0.0")
-    testImplementation("compose.hooks:query-test:1.0.0")   // includes hooks-test
+    implementation("compose.hooks:hooks:1.0.1")
+    implementation("compose.hooks:query:1.0.1")
+    testImplementation("compose.hooks:hooks-test:1.0.1")
+    testImplementation("compose.hooks:query-test:1.0.1")   // includes hooks-test
 }
 ```
 
@@ -166,11 +166,11 @@ plugins {
     id("com.android.library")                   // or application
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("compose.hooks") version "1.0.0"
+    id("compose.hooks") version "1.0.1"
 }
 ```
 
-- Adds `compose.hooks:hooks-compiler:1.0.0` to every Kotlin compilation, unit tests included.
+- Adds `compose.hooks:hooks-compiler:1.0.1` to every Kotlin compilation, unit tests included.
 - In Android modules it sets `android.testOptions.unitTests.isReturnDefaultValues = true`, because the Compose runtime
   calls `android.os.Trace`, which throws in JVM unit tests. It is set when the plugin is applied, so an explicit value
   in your `android { }` block still wins.
@@ -213,7 +213,11 @@ class CounterTest {
 - Time: `advanceTimeBy(ms | Duration)`, `advanceUntilIdle()`, `runCurrent()`, `currentTime`, `testScope`,
   `mainDispatcher` (`Dispatchers.Main` during the test).
 - Errors: failures of `Hooks.onError`, composition and hook coroutines are collected. The test fails if any are left,
-  so call `takeErrors()` to expect them.
+  so call `takeErrors()` to expect them. This includes an exception thrown by the first composition of `renderHook` /
+  `show()`, e.g. a `MissingProviderException` for a missing parent: `renderHook` returns, the result is not shown and
+  has no value, and the error is in `takeErrors()`.
+- `null` is a value: a hook returning `R?` commits `null` like any other value (`current == null`, `history`
+  contains it). `current` only fails before the first commit.
 - Wrappers and teardown: `addWrapper { content -> }` and `onTeardown { }`. At the end, every composition is
   disposed, every live entry is popped (endless effect loops stop), teardown callbacks run in reverse order, and
   `Hooks.onError` and `Dispatchers.Main` are restored.
@@ -266,6 +270,10 @@ GITHUB_ACTOR=<user> GITHUB_TOKEN=<token with write:packages> ./gradlew publish  
 ```
 
 Coverage gate (Kover, JVM unit tests): line ≥ 95% and branch ≥ 80% in every published module.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

@@ -37,7 +37,7 @@ class ComposeHooksGradlePluginTest {
         val a = plugin.getPluginArtifact()
         assertEquals("compose.hooks", a.groupId)
         assertEquals("hooks-compiler", a.artifactId)
-        assertEquals("1.0.0", a.version)
+        assertEquals("1.0.1", a.version)
     }
 
     @Test fun applicableToEveryCompilationWithNoOptions() {

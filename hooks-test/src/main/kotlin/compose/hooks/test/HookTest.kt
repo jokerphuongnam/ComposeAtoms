@@ -132,8 +132,12 @@ class HookResult<P, R> internal constructor(
     /** Committed values, one per successful (re)composition of the hook, oldest first. */
     val history: List<R> get() = committed.toList()
 
-    /** The latest committed value. */
-    val current: R get() = committed.lastOrNull() ?: throw AssertionError("the hook has not committed a value yet")
+    /** The latest committed value (null is a valid value for a hook that returns `R?`). */
+    val current: R get() {
+        // emptiness, not lastOrNull(): a committed null must not read as "nothing committed"
+        if (committed.isEmpty()) throw AssertionError("the hook has not committed a value yet")
+        return committed[committed.size - 1]
+    }
 
     /** Number of times the hook ran: its first composition plus every recomposition of it. */
     var recomposeCount: Int = 0
@@ -174,11 +178,24 @@ class HookResult<P, R> internal constructor(
         host.runCurrent()
     }
 
-    /** Composition created again for the same owner (back navigation). */
+    /**
+     * Composition created again for the same owner (back navigation).
+     *
+     * An exception thrown while composing (e.g. a `MissingProviderException` for a missing parent / context) does not
+     * escape: it is reported like any other hook error ([HookTestScope.takeErrors]), the failed composition is
+     * disposed ([isShown] stays false) and nothing is committed.
+     */
     fun show() {
         check(composition == null) { "already shown" }
         check(owner?.isPopped != true) { "owner was popped" }
-        composition = Composition(UnitApplier, host.recomposer).apply { setContent { Content() } }
+        val c = Composition(UnitApplier, host.recomposer)
+        try {
+            c.setContent { Content() }
+            composition = c
+        } catch (e: Throwable) {
+            host.report(e)
+            runCatching { c.dispose() } // a half-built composition may fail to dispose; the first error is what counts
+        }
         host.runCurrent()
     }
 

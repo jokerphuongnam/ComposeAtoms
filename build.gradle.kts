@@ -10,7 +10,7 @@ plugins {
     id("org.jetbrains.dokka") version "1.9.20" apply false
 }
 
-// Every library module publishes compose.hooks:<module>:1.0.0 (with a sources jar) to mavenLocal (publishToMavenLocal)
+// Every library module publishes compose.hooks:<module>:1.0.1 (with a sources jar) to mavenLocal (publishToMavenLocal)
 // or GitHub Packages (publish). Credentials come from gradle properties gpr.user / gpr.key or the env
 // GITHUB_ACTOR / GITHUB_TOKEN; never put a token in this repository.
 /** The `description` of each published module's POM (a published module missing here fails the build). */
@@ -27,7 +27,7 @@ fun Project.pomProperty(name: String): String = requireNotNull(findProperty(name
 
 subprojects {
     group = "compose.hooks"
-    version = "1.0.0"
+    version = "1.0.1"
     plugins.withId("maven-publish") {
         extensions.configure<PublishingExtension> {
             repositories {
