@@ -52,7 +52,7 @@ class ComposeHooksGradlePlugin : KotlinCompilerPluginSupportPlugin {
     /** Constants. */
     companion object {
         /** The hooks-compiler version this plugin adds (the release version). */
-        const val VERSION = "1.0.0"
+        const val VERSION = "1.0.1"
         /** The Kotlin Compose compiler Gradle plugin id. */
         const val COMPOSE_COMPILER = "org.jetbrains.kotlin.plugin.compose"
         /**

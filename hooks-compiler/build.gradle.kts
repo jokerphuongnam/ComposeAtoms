@@ -51,7 +51,7 @@ kover {
     }
 }
 
-// compose.hooks:hooks-compiler:1.0.0, the artifact the gradle plugin (SubpluginArtifact) adds to kotlinc
+// compose.hooks:hooks-compiler:1.0.1, the artifact the gradle plugin (SubpluginArtifact) adds to kotlinc
 publishing {
     publications {
         create<MavenPublication>("maven") {

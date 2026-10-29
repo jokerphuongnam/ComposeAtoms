@@ -42,8 +42,8 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:compose-compiler-gradle-plugin:$kotlinVersion")
 }
 
-// published as compose.hooks:hooks-gradle-plugin:1.0.0 (pluginMaven) + the plugin marker
-// compose.hooks:compose.hooks.gradle.plugin:1.0.0 (java-gradle-plugin creates both)
+// published as compose.hooks:hooks-gradle-plugin:1.0.1 (pluginMaven) + the plugin marker
+// compose.hooks:compose.hooks.gradle.plugin:1.0.1 (java-gradle-plugin creates both)
 
 kover {
     reports {

@@ -2,6 +2,7 @@ package compose.hooks.test
 
 import androidx.compose.runtime.mutableIntStateOf
 import compose.hooks.Hooks
+import compose.hooks.MissingProviderException
 import compose.hooks.customRemember
 import compose.hooks.rememberContext
 import compose.hooks.rememberContextOf
@@ -232,5 +233,43 @@ class HookTestTest {
     @Test fun aFailingTeardownIsReported() {
         val e = assertFails<AssertionError> { runHookTest { onTeardown { error("teardown failed") } } }
         assertEquals("teardown failed", e.cause!!.message)
+    }
+
+    // 1.0.1 regression: a hook returning null used to read as "not committed"
+    @Test fun nullIsACommittedValue() = runHookTest {
+        val value = mutableIntStateOf(0)
+        val result = renderHook<String?> { if (value.intValue == 0) null else "one" }
+        assertEquals(null, result.current)
+        assertEquals(listOf<String?>(null), result.history)
+        result.act { value.intValue = 1 }
+        result.act { value.intValue = 0 }
+        assertEquals(null, result.current)
+        assertEquals(listOf(null, "one", null), result.history)
+        assertEquals(null, result.history.first())
+    }
+
+    @Test fun nullIsACommittedValue_strictHistory() = runHookTest {
+        val result = renderHook<Int?>(strictHistory = true) { null }
+        assertEquals(null, result.nextValue())
+        result.expectNoValue()
+    }
+
+    // 1.0.1 regression: a missing parent (provider) used to throw straight out of renderHook
+    @Test fun missingProviderIsCollected_notThrownOutOfRenderHook() = runHookTest {
+        val result = renderHook { rememberContext(Theme) }
+        val error = takeErrors().single()
+        assertTrue(error is MissingProviderException)
+        assertFalse("the failed composition is disposed", result.isShown)
+        assertTrue(result.history.isEmpty())
+        assertTrue(assertFails<AssertionError> { result.current }.message!!.contains("not committed"))
+        // the same hook with the parent provided renders normally afterwards
+        assertEquals("dark", renderHook(provide = listOf(Theme provides "dark")) { rememberContext(Theme) }.current)
+        result.show()
+        assertTrue(takeErrors().single() is MissingProviderException)
+    }
+
+    @Test fun anUntakenMissingProviderFailsTheTest() {
+        val e = assertFails<AssertionError> { runHookTest { renderHook { rememberContext(Theme) } } }
+        assertTrue(e.cause is MissingProviderException)
     }
 }
